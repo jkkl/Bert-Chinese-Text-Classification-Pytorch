@@ -1,4 +1,6 @@
 # coding: UTF-8
+import os
+os.environ["CUDA_VISIBLE_DEVICES"] = ""
 import time
 import torch
 import numpy as np
