@@ -8,7 +8,7 @@ from pytorch_pretrained import BertModel, BertTokenizer
 class Config(object):
 
     """配置参数"""
-    def __init__(self, dataset):
+    def __init__(self, dataset, loss_func=None):
         self.model_name = 'bert'
         self.train_path = dataset + '/data/train.txt'                                # 训练集
         self.dev_path = dataset + '/data/dev.txt'                                    # 验证集
@@ -30,6 +30,9 @@ class Config(object):
         self.filter_sizes = (2, 3, 4)                                   # 卷积核尺寸
         self.num_filters = 256                                          # 卷积核数量(channels数)
         self.dropout = 0.1
+        self.loss_func = loss_func
+
+
 
 
 class Model(nn.Module):

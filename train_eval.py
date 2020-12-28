@@ -5,8 +5,11 @@ import torch.nn as nn
 import torch.nn.functional as F
 from sklearn import metrics
 import time
+
+from models.scl_loss import SCLLoss
 from utils import get_time_dif
 from pytorch_pretrained_bert.optimization import BertAdam
+import pandas as pd
 
 
 # 权重初始化，默认xavier
@@ -46,12 +49,18 @@ def train(config, model, train_iter, dev_iter, test_iter):
     last_improve = 0  # 记录上次验证集loss下降的batch数
     flag = False  # 记录是否很久没有效果提升
     model.train()
+    scl_loss = SCLLoss(20, 0.001)
     for epoch in range(config.num_epochs):
         print('Epoch [{}/{}]'.format(epoch + 1, config.num_epochs))
         for i, (trains, labels) in enumerate(train_iter):
             outputs = model(trains)
             model.zero_grad()
-            loss = F.cross_entropy(outputs, labels)
+            if config.loss_func == 'scl_loss':
+                loss = F.cross_entropy(outputs, labels)
+                loss += scl_loss(outputs, labels)
+            else:
+                loss = F.cross_entropy(outputs, labels)
+
             loss.backward()
             optimizer.step()
             if total_batch % 100 == 0:
@@ -84,7 +93,7 @@ def train(config, model, train_iter, dev_iter, test_iter):
 
 def test(config, model, test_iter):
     # test
-    model.load_state_dict(torch.load(config.save_path))
+    model.load_state_dict(torch.load(config.save_path, map_location=config.device))
     model.eval()
     start_time = time.time()
     test_acc, test_loss, test_report, test_confusion = evaluate(config, model, test_iter, test=True)
@@ -103,6 +112,37 @@ def evaluate(config, model, data_iter, test=False):
     loss_total = 0
     predict_all = np.array([], dtype=int)
     labels_all = np.array([], dtype=int)
+    scl_loss = SCLLoss(20, 0.001)
+
+    with torch.no_grad():
+        for texts, labels in data_iter:
+            outputs = model(texts)
+            if config.loss_func == 'scl_loss':
+                loss = F.cross_entropy(outputs, labels)
+                loss += scl_loss(outputs, labels)
+            else:
+                loss = F.cross_entropy(outputs, labels)
+            loss_total += loss
+            labels = labels.data.cpu().numpy()
+            predic = torch.max(outputs.data, 1)[1].cpu().numpy()
+            labels_all = np.append(labels_all, labels)
+            predict_all = np.append(predict_all, predic)
+
+    acc = metrics.accuracy_score(labels_all, predict_all)
+    if test:
+        report = metrics.classification_report(labels_all, predict_all, digits=4)
+        confusion = metrics.confusion_matrix(labels_all, predict_all)
+        return acc, loss_total / len(data_iter), report, confusion
+    return acc, loss_total / len(data_iter)
+
+
+def predict(config, model, data_iter, test=False):
+    model.eval()
+    loss_total = 0
+    predict_all = np.array([], dtype=int)
+    labels_all = np.array([], dtype=int)
+    score_all = np.array([], dtype=float)
+    text_all = np.array([], dtype=str)
     with torch.no_grad():
         for texts, labels in data_iter:
             outputs = model(texts)
@@ -112,10 +152,18 @@ def evaluate(config, model, data_iter, test=False):
             predic = torch.max(outputs.data, 1)[1].cpu().numpy()
             labels_all = np.append(labels_all, labels)
             predict_all = np.append(predict_all, predic)
+            score = F.softmax(outputs.data, 1)
+            score_max = torch.max(score, dim=1)[0]
+            score_all = np.append(score_all, score_max)
+            text_all = np.append(text_all, texts)
 
     acc = metrics.accuracy_score(labels_all, predict_all)
     if test:
-        report = metrics.classification_report(labels_all, predict_all, target_names=config.class_list, digits=4)
+        # 输出测评数据的预测类别及概率
+        result_arr = np.c_[texts, labels_all, predict_all, score_all]
+        result_table = pd.DataFrame(result_arr, index=None, columns=['Query', 'True', 'Predict', 'Score'])
+        result_table.to_excel(config.predict_path)
+        report = metrics.classification_report(labels_all, predict_all, digits=4)
         confusion = metrics.confusion_matrix(labels_all, predict_all)
         return acc, loss_total / len(data_iter), report, confusion
     return acc, loss_total / len(data_iter)
