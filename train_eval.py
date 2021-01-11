@@ -5,6 +5,8 @@ import torch.nn as nn
 import torch.nn.functional as F
 from sklearn import metrics
 import time
+
+from models.scl_loss import SCLLoss
 from utils import get_time_dif
 from pytorch_pretrained_bert.optimization import BertAdam
 
@@ -52,25 +54,28 @@ def train(config, model, train_iter, dev_iter, test_iter):
             outputs = model(trains)
             model.zero_grad()
             loss = F.cross_entropy(outputs, labels)
+            # scl_loss = SCLLoss(2, 0.001)
+            # loss += scl_loss(outputs, labels)
+            # print('train scl_loss:{}, loss:{}'.format(scl_loss, loss))
             loss.backward()
             optimizer.step()
-            if total_batch % 100 == 0:
-                # 每多少轮输出在训练集和验证集上的效果
-                true = labels.data.cpu()
-                predic = torch.max(outputs.data, 1)[1].cpu()
-                train_acc = metrics.accuracy_score(true, predic)
-                dev_acc, dev_loss = evaluate(config, model, dev_iter)
-                if dev_loss < dev_best_loss:
-                    dev_best_loss = dev_loss
-                    torch.save(model.state_dict(), config.save_path)
-                    improve = '*'
-                    last_improve = total_batch
-                else:
-                    improve = ''
-                time_dif = get_time_dif(start_time)
-                msg = 'Iter: {0:>6},  Train Loss: {1:>5.2},  Train Acc: {2:>6.2%},  Val Loss: {3:>5.2},  Val Acc: {4:>6.2%},  Time: {5} {6}'
-                print(msg.format(total_batch, loss.item(), train_acc, dev_loss, dev_acc, time_dif, improve))
-                model.train()
+            # if total_batch % 10 == 0:
+            # 每多少轮输出在训练集和验证集上的效果
+            true = labels.data.cpu()
+            predict = torch.max(outputs.data, 1)[1].cpu()
+            train_acc = metrics.accuracy_score(true, predict)
+            dev_acc, dev_loss = evaluate(config, model, dev_iter)
+            if dev_loss < dev_best_loss:
+                dev_best_loss = dev_loss
+                torch.save(model.state_dict(), config.save_path)
+                improve = '*'
+                last_improve = total_batch
+            else:
+                improve = ''
+            time_dif = get_time_dif(start_time)
+            msg = 'Iter: {0:>6},  Train Loss: {1:>5.2},  Train Acc: {2:>6.2%},  Val Loss: {3:>5.2},  Val Acc: {4:>6.2%},  Time: {5} {6}'
+            print(msg.format(total_batch, loss.item(), train_acc, dev_loss, dev_acc, time_dif, improve))
+            model.train()
             total_batch += 1
             if total_batch - last_improve > config.require_improvement:
                 # 验证集loss超过1000batch没下降，结束训练
@@ -107,6 +112,8 @@ def evaluate(config, model, data_iter, test=False):
         for texts, labels in data_iter:
             outputs = model(texts)
             loss = F.cross_entropy(outputs, labels)
+            scl_loss = SCLLoss(20, 0.01)
+            loss += scl_loss(outputs, labels)
             loss_total += loss
             labels = labels.data.cpu().numpy()
             predic = torch.max(outputs.data, 1)[1].cpu().numpy()
