@@ -54,9 +54,9 @@ def train(config, model, train_iter, dev_iter, test_iter):
             outputs = model(trains)
             model.zero_grad()
             loss = F.cross_entropy(outputs, labels)
-            # scl_loss = SCLLoss(2, 0.001)
-            # loss += scl_loss(outputs, labels)
-            # print('train scl_loss:{}, loss:{}'.format(scl_loss, loss))
+            scl_loss = SCLLoss(2, 0.001)
+            loss += scl_loss(outputs, labels)
+            print('train scl_loss:{}, loss:{}'.format(scl_loss, loss))
             loss.backward()
             optimizer.step()
             # if total_batch % 10 == 0:
