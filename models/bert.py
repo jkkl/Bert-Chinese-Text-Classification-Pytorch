@@ -3,6 +3,7 @@ import torch
 import torch.nn as nn
 # from pytorch_pretrained_bert import BertModel, BertTokenizer
 from pytorch_pretrained import BertModel, BertTokenizer
+from torch.autograd import Variable
 
 
 class Config(object):
@@ -37,6 +38,7 @@ class Model(nn.Module):
         for param in self.bert.parameters():
             param.requires_grad = True
         self.fc = nn.Linear(config.hidden_size, config.num_classes)
+        self.loss_weight = Variable(torch.rand(2), requires_grad=True)
 
     def forward(self, x):
         context = x[0]  # 输入的句子

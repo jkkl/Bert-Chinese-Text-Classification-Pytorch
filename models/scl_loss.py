@@ -8,6 +8,7 @@ Created on: 2020/12/23 13:35
 import torch
 import torch.nn as nn
 import torch.nn.functional as func
+from torch.autograd import Variable
 
 
 def get_class_num(input_y):
@@ -50,11 +51,9 @@ def get_self_mask(batch_size):
 
 
 class SCLLoss(nn.Module):
-    def __init__(self, t, weight):
+    def __init__(self, t):
         super(SCLLoss, self).__init__()
         self.t = t
-        self.weight = weight
-        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
     def forward(self, input_x, input_y):
         '''
@@ -71,9 +70,9 @@ class SCLLoss(nn.Module):
         sample_distance = torch.mm(input_x_l2, input_x_l2.t())
         sample_distance = torch.exp(sample_distance / self.t)
         # 构造类别掩码矩阵
-        class_mask = get_class_mask(input_y).to(self.device)
+        class_mask = get_class_mask(input_y)
         # 构造自身相乘掩码矩阵
-        self_mask = get_self_mask(batch_size).to(self.device)
+        self_mask = get_self_mask(batch_size)
         sample_distance_sum = sample_distance * self_mask
         sample_distance_sum = torch.sum(sample_distance_sum, dim=1, keepdim=True)  # [batch_size]
         sample_distance_sum_tile = sample_distance_sum.expand(batch_size, batch_size)
@@ -81,9 +80,9 @@ class SCLLoss(nn.Module):
         sample_distance = sample_distance * self_mask
         sample_distance = sample_distance * class_mask
         class_num = get_class_num(input_y)
-        inner_class_distance_sum = -1.0 * torch.sum(sample_distance, dim=1, keepdim=True) / class_num.to(self.device)
+        inner_class_distance_sum = -1.0 * torch.sum(sample_distance, dim=1, keepdim=True) / class_num
         # 当一个batch中，某个类别只有一个样本时，class_num = 1 -1 = 0， 当除以 class_num后，产生inf值, 故将inf置为0。
         inner_class_distance_sum = torch.where(torch.isinf(inner_class_distance_sum), torch.full_like(inner_class_distance_sum, 0), inner_class_distance_sum)
         inner_class_distance_sum = torch.where(torch.isnan(inner_class_distance_sum), torch.full_like(inner_class_distance_sum, 0), inner_class_distance_sum)
         inner_class_distance_sum = torch.sum(inner_class_distance_sum)
-        return inner_class_distance_sum * self.weight
+        return inner_class_distance_sum

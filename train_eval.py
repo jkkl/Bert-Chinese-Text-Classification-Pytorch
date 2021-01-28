@@ -48,14 +48,17 @@ def train(config, model, train_iter, dev_iter, test_iter):
     last_improve = 0  # 记录上次验证集loss下降的batch数
     flag = False  # 记录是否很久没有效果提升
     model.train()
+    scl = SCLLoss(2).to(config.device)
     for epoch in range(config.num_epochs):
         print('Epoch [{}/{}]'.format(epoch + 1, config.num_epochs))
         for i, (trains, labels) in enumerate(train_iter):
             outputs = model(trains)
             model.zero_grad()
-            loss = F.cross_entropy(outputs, labels)
-            scl_loss = SCLLoss(2, 0.001)
-            loss += scl_loss(outputs, labels)
+            cross_loss = F.cross_entropy(outputs, labels)
+            scl_loss = scl(outputs, labels)
+            loss = torch.tensor([cross_loss, scl_loss]) * model.loss_weight
+            loss = torch.sum(loss)
+
             print('train scl_loss:{}, loss:{}'.format(scl_loss, loss))
             loss.backward()
             optimizer.step()
@@ -108,13 +111,14 @@ def evaluate(config, model, data_iter, test=False):
     loss_total = 0
     predict_all = np.array([], dtype=int)
     labels_all = np.array([], dtype=int)
+    scl = SCLLoss(2).to(config.device)
     with torch.no_grad():
         for texts, labels in data_iter:
             outputs = model(texts)
-            loss = F.cross_entropy(outputs, labels)
-            scl_loss = SCLLoss(20, 0.01)
-            loss += scl_loss(outputs, labels)
-            loss_total += loss
+            cross_loss = F.cross_entropy(outputs, labels)
+            scl_loss = scl(outputs, labels)
+            loss = torch.tensor([cross_loss, scl_loss]) * model.loss_weight
+            loss_total += torch.sum(loss)
             labels = labels.data.cpu().numpy()
             predic = torch.max(outputs.data, 1)[1].cpu().numpy()
             labels_all = np.append(labels_all, labels)

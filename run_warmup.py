@@ -1,9 +1,10 @@
 # coding: UTF-8
 import os
+os.environ["CUDA_VISIBLE_DEVICES"] = ""
 import time
 import torch
 import numpy as np
-from train_eval import train, init_network, test
+from train_eval import train, init_network
 from importlib import import_module
 import argparse
 from utils import build_dataset, build_iterator, get_time_dif
@@ -28,8 +29,8 @@ if __name__ == '__main__':
     print("Loading data...")
     train_data, dev_data, test_data = build_dataset(config)
 
-    train_data, dev_data, test_data = train_data, dev_data, test_data
-    # config.batch_size = 16
+    train_data, dev_data, test_data = train_data[:200], dev_data[:100], test_data[:100]
+    config.batch_size = 16
     train_iter = build_iterator(train_data, config)
     dev_iter = build_iterator(dev_data, config)
     test_iter = build_iterator(test_data, config)
@@ -39,4 +40,3 @@ if __name__ == '__main__':
     # train
     model = x.Model(config).to(config.device)
     train(config, model, train_iter, dev_iter, test_iter)
-    test(config, model, test_iter)
