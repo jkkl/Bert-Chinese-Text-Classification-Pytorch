@@ -1,6 +1,5 @@
 # coding: UTF-8
 import os
-os.environ["CUDA_VISIBLE_DEVICES"] = ""
 import time
 import torch
 import numpy as np
@@ -15,7 +14,7 @@ args = parser.parse_args()
 
 
 if __name__ == '__main__':
-    dataset = 'Intention2'  # 数据集
+    dataset = 'data/Intention2'  # 数据集
 
     model_name = args.model  # bert
     x = import_module('models.' + model_name)
