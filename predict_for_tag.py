@@ -28,8 +28,8 @@ def predict_tag(config_list, model_list, data_iter, out_file):
                 outputs.append((batch_labels, batch_scores))
             
             is_diff = [label == pred for label, pred in zip(labels, outputs[0][0])]
-            batch_out_data = {'query': queries, 'origin_bi_label': labels, 'predict_bi_label': outputs[0][0],'predict_bi_score': outputs[0][1],
-                              'is_diff': is_diff.cpu().numpy(), "predict_mu_label": outputs[1][0], "predict_mu_score": outputs[1][1]}
+            batch_out_data = {'query': queries, 'origin_bi_label': labels.cpu().numpy(), 'predict_bi_label': outputs[0][0],'predict_bi_score': outputs[0][1],
+                              'is_diff': is_diff, "predict_mu_label": outputs[1][0], "predict_mu_score": outputs[1][1]}
             batch_result = pd.DataFrame(batch_out_data)
             result_pd = result_pd.append(batch_result)
     result_pd.to_csv(out_file, sep='\t')
