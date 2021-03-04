@@ -1,0 +1,17 @@
+tqdm
+sklearn
+tensorboardX
+pytorch_pretrained_bert
+Flask
+openpyxl
+sklearn
+prettytable
+jieba
+gensim
+matplotlib
+urllib3
+numpy
+clr
+pandas
+xlrd==1.2.0
+hanlp

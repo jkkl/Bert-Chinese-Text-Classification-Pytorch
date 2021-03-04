@@ -31,12 +31,43 @@ def build_dataset(config):
                         mask = [1] * pad_size
                         token_ids = token_ids[:pad_size]
                         seq_len = pad_size
-                contents.append((token_ids, int(label), seq_len, mask))
+                contents.append((token_ids, int(label), seq_len, mask, content))
         return contents
     train = load_dataset(config.train_path, config.pad_size)
     dev = load_dataset(config.dev_path, config.pad_size)
     test = load_dataset(config.test_path, config.pad_size)
     return train, dev, test
+
+'''
+单query预测
+'''
+def build_query(config, query):
+    def _to_tensor(datas):
+        x = torch.LongTensor([_[0] for _ in datas]).to(config.device)
+        # pad前的长度(超过pad_size的设为pad_size)
+        seq_len = torch.LongTensor([_[2] for _ in datas]).to(config.device)
+        mask = torch.LongTensor([_[3] for _ in datas]).to(config.device)
+        return x, seq_len, mask
+
+    content = query
+    label = '0'
+    token = config.tokenizer.tokenize(content)
+    token = [CLS] + token
+    seq_len = len(token)
+    mask = []
+    token_ids = config.tokenizer.convert_tokens_to_ids(token)
+    pad_size = config.pad_size
+    if pad_size:
+        if len(token) < pad_size:
+            mask = [1] * len(token_ids) + [0] * (pad_size - len(token))
+            token_ids += ([0] * (pad_size - len(token)))
+        else:
+            mask = [1] * pad_size
+            token_ids = token_ids[:pad_size]
+            seq_len = pad_size
+    inputList = [(token_ids, int(label), seq_len, mask, content)]
+    input = _to_tensor(inputList)
+    return input 
 
 
 class DatasetIterater(object):
@@ -58,7 +89,8 @@ class DatasetIterater(object):
         # pad前的长度(超过pad_size的设为pad_size)
         seq_len = torch.LongTensor([_[2] for _ in datas]).to(self.device)
         mask = torch.LongTensor([_[3] for _ in datas]).to(self.device)
-        return (x, seq_len, mask), y
+        queries = [_[4] for _ in datas]
+        return (x, seq_len, mask), y, queries
 
     def __next__(self):
         if self.residue and self.index == self.n_batches:
