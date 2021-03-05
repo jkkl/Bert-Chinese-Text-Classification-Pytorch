@@ -66,11 +66,13 @@ def evaluate(config, model, data_iter, out_file, test=False):
 
 if __name__ == '__main__':
     # dataset = 'data/Intention2_V2'  # 数据集
-    dataset = 'data/Intention135'  # 数据集
+    dataset = 'data/Intention2_V2'  # 数据集
+    # model_dir = 'data/Intention2/saved_dict/bert.ckpt'
 
     model_name = args.model  # bert
     x = import_module('models.' + model_name)
     config = x.Config(dataset)
+    # config.save_path = model_dir
     np.random.seed(1)
     torch.manual_seed(1)
     torch.cuda.manual_seed_all(1)

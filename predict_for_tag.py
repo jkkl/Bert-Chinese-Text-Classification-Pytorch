@@ -24,12 +24,13 @@ def predict_tag(config_list, model_list, data_iter, out_file):
             for config, model in zip(config_list, model_list):
                 batch_output = model(texts)
                 batch_labels = torch.max(batch_output.data, 1)[1].cpu().numpy()
-                batch_scores = torch.max(batch_output.data, 1)[0].cpu().numpy()
-                outputs.append((batch_labels, batch_scores))
+                batch_labels_name = [config.class_list[i] for i in batch_labels]
+                batch_scores = torch.max(torch.softmax(batch_output.data, 1),1)[0].cpu().numpy()
+                outputs.append((batch_labels, batch_scores, batch_labels_name))
             
-            is_diff = [label == pred for label, pred in zip(labels, outputs[0][0])]
+            is_diff = [(label == pred).cpu().numpy() for label, pred in zip(labels, outputs[0][0])]
             batch_out_data = {'query': queries, 'origin_bi_label': labels.cpu().numpy(), 'predict_bi_label': outputs[0][0],'predict_bi_score': outputs[0][1],
-                              'is_diff': is_diff, "predict_mu_label": outputs[1][0], "predict_mu_score": outputs[1][1]}
+                              'is_diff': is_diff, "predict_mu_label": outputs[1][2], "predict_mu_score": outputs[1][1]}
             batch_result = pd.DataFrame(batch_out_data)
             result_pd = result_pd.append(batch_result)
     result_pd.to_csv(out_file, sep='\t')
@@ -49,9 +50,16 @@ def load_model_dict(dataset_list, model_type):
     
     return model_list, config_list
 
-def load_tag_data(config):
+def load_tag_data(config, data_type):
+
     train_data, dev_data, test_data = build_dataset(config)
-    tag_data = build_iterator(train_data, config)
+    if data_type == 'train':
+        tag_data = build_iterator(train_data, config)
+    elif data_type == 'dev':
+        tag_data = build_iterator(dev_data, config)
+    elif data_type == 'test':
+        tag_data = build_iterator(test_data, config)
+    
     return tag_data
 
 
@@ -63,7 +71,8 @@ if __name__ == '__main__':
     model_list, config_list = load_model_dict(dataset_list, model_type)
     x = import_module('models.' + model_type)
     tag_data_config = x.Config(dataset2)
-    tag_data = load_tag_data(tag_data_config)
+    data_type = 'dev'
+    tag_data = load_tag_data(tag_data_config, data_type)
 
-    out_file = dataset2 + '/iter/train_iter.csv'
+    out_file = dataset2 + f'/iter/{data_type}_iter.csv'
     predict_tag(config_list, model_list, tag_data, out_file)

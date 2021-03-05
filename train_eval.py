@@ -9,6 +9,7 @@ import time
 from models.scl_loss import SCLLoss
 from utils import get_time_dif
 from pytorch_pretrained_bert.optimization import BertAdam
+from tools.logger import logger
 
 
 # 权重初始化，默认xavier
@@ -45,44 +46,41 @@ def train(config, model, train_iter, dev_iter, test_iter):
                          t_total=len(train_iter) * config.num_epochs)
     total_batch = 0  # 记录进行到多少batch
     dev_best_loss = float('inf')
+    dev_best_acc = 0.0
     last_improve = 0  # 记录上次验证集loss下降的batch数
     flag = False  # 记录是否很久没有效果提升
     model.train()
     # scl = SCLLoss(2).to(config.device)
     for epoch in range(config.num_epochs):
-        print('Epoch [{}/{}]'.format(epoch + 1, config.num_epochs))
-        for i, (trains, labels) in enumerate(train_iter):
+        logger.info('Epoch [{}/{}]'.format(epoch + 1, config.num_epochs))
+        for i, (trains, labels, queries) in enumerate(train_iter):
             outputs = model(trains)
             model.zero_grad()
             loss = F.cross_entropy(outputs, labels)
-            # scl_loss = scl(outputs, labels)
-            # loss = torch.tensor([cross_loss, scl_loss]) * model.loss_weight
-            # loss = torch.sum(loss)
-
-            print('loss:{}'.format(loss))
             loss.backward()
             optimizer.step()
-            # if total_batch % 10 == 0:
-            # 每多少轮输出在训练集和验证集上的效果
-            true = labels.data.cpu()
-            predict = torch.max(outputs.data, 1)[1].cpu()
-            train_acc = metrics.accuracy_score(true, predict)
-            dev_acc, dev_loss = evaluate(config, model, dev_iter)
-            if dev_loss < dev_best_loss:
-                dev_best_loss = dev_loss
-                torch.save(model.state_dict(), config.save_path)
-                improve = '*'
-                last_improve = total_batch
-            else:
-                improve = ''
-            time_dif = get_time_dif(start_time)
-            msg = 'Iter: {0:>6},  Train Loss: {1:>5.2},  Train Acc: {2:>6.2%},  Val Loss: {3:>5.2},  Val Acc: {4:>6.2%},  Time: {5} {6}'
-            print(msg.format(total_batch, loss.item(), train_acc, dev_loss, dev_acc, time_dif, improve))
-            model.train()
+            if total_batch % 100 == 0:
+                # 每多少轮输出在训练集和验证集上的效果
+                true = labels.data.cpu()
+                predict = torch.max(outputs.data, 1)[1].cpu()
+                train_acc = metrics.accuracy_score(true, predict)
+                dev_acc, dev_loss = evaluate(config, model, dev_iter)
+                # if dev_loss < dev_best_loss:
+                if dev_acc > dev_best_acc:
+                    dev_best_acc = dev_acc
+                    torch.save(model.state_dict(), config.save_path)
+                    improve = '*'
+                    last_improve = total_batch
+                else:
+                    improve = ''
+                time_dif = get_time_dif(start_time)
+                msg = 'Iter: {0:>6},  Train Loss: {1:>5.2},  Train Acc: {2:>6.2%},  Val Loss: {3:>5.2},  Val Acc: {4:>6.2%},  Time: {5} {6}'
+                logger.info(msg.format(total_batch, loss.item(), train_acc, dev_loss, dev_acc, time_dif, improve))
+                model.train()
             total_batch += 1
             if total_batch - last_improve > config.require_improvement:
                 # 验证集loss超过1000batch没下降，结束训练
-                print("No optimization for a long time, auto-stopping...")
+                logger.info("No optimization for a long time, auto-stopping...")
                 flag = True
                 break
         if flag:
@@ -97,13 +95,13 @@ def test(config, model, test_iter):
     start_time = time.time()
     test_acc, test_loss, test_report, test_confusion = evaluate(config, model, test_iter, test=True)
     msg = 'Test Loss: {0:>5.2},  Test Acc: {1:>6.2%}'
-    print(msg.format(test_loss, test_acc))
-    print("Precision, Recall and F1-Score...")
-    print(test_report)
-    print("Confusion Matrix...")
-    print(test_confusion)
+    logger.info(msg.format(test_loss, test_acc))
+    logger.info("Precision, Recall and F1-Score...")
+    logger.info(test_report)
+    logger.info("Confusion Matrix...")
+    logger.info(test_confusion)
     time_dif = get_time_dif(start_time)
-    print("Time usage:", time_dif)
+    logger.info("Time usage:".format(time_dif))
 
 
 def evaluate(config, model, data_iter, test=False):
@@ -111,13 +109,10 @@ def evaluate(config, model, data_iter, test=False):
     loss_total = 0
     predict_all = np.array([], dtype=int)
     labels_all = np.array([], dtype=int)
-    # scl = SCLLoss(2).to(config.device)
     with torch.no_grad():
-        for texts, labels in data_iter:
+        for texts, labels, queries in data_iter:
             outputs = model(texts)
             loss = F.cross_entropy(outputs, labels)
-            # scl_loss = scl(outputs, labels)
-            # loss = torch.tensor([cross_loss, scl_loss]) * model.loss_weight
             loss_total += torch.sum(loss)
             labels = labels.data.cpu().numpy()
             predic = torch.max(outputs.data, 1)[1].cpu().numpy()

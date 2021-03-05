@@ -8,13 +8,20 @@ from importlib import import_module
 import argparse
 from utils import build_dataset, build_iterator, get_time_dif
 
+from tools.logger import logger, setting_logging
+
+
 parser = argparse.ArgumentParser(description='Chinese Text Classification')
 parser.add_argument('--model', type=str, default='bert', help='choose a model: Bert, ERNIE')
 args = parser.parse_args()
 
 
 if __name__ == '__main__':
-    dataset = 'data/Intention2'  # 数据集
+    task_name = "new_data_acc"
+    task_desc = "new_iter_data"
+    setting_logging("{}_{}".format(task_name, task_desc))
+    
+    dataset = 'data/Intention2_V2'  # 数据集
 
     model_name = args.model  # bert
     x = import_module('models.' + model_name)
@@ -25,7 +32,7 @@ if __name__ == '__main__':
     torch.backends.cudnn.deterministic = True  # 保证每次结果一样
 
     start_time = time.time()
-    print("Loading data...")
+    logger.info("Loading data...")
     train_data, dev_data, test_data = build_dataset(config)
 
     train_data, dev_data, test_data = train_data, dev_data, test_data
@@ -34,7 +41,7 @@ if __name__ == '__main__':
     dev_iter = build_iterator(dev_data, config)
     test_iter = build_iterator(test_data, config)
     time_dif = get_time_dif(start_time)
-    print("Time usage:", time_dif)
+    logger.info("Time usage:".format(time_dif))
 
     # train
     model = x.Model(config).to(config.device)
