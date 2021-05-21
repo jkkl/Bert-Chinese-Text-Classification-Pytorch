@@ -13,6 +13,9 @@ from utils import build_dataset, build_iterator, get_time_dif
 
 parser = argparse.ArgumentParser(description='Chinese Text Classification')
 parser.add_argument('--model', type=str, default='bert', help='choose a model: Bert, ERNIE')
+parser.add_argument('--data_dir', type=str, help='data_dir, eg: data/Intention2')
+parser.add_argument('--task_name', type=str, help='task_name used in log name and sample file prefix')
+
 args = parser.parse_args()
 
 def predict(config, model, test_iter, out_file):
@@ -66,12 +69,15 @@ def evaluate(config, model, data_iter, out_file, test=False):
 
 if __name__ == '__main__':
     # dataset = 'data/Intention2_V2'  # 数据集
-    dataset = 'data/Intention2_V2'  # 数据集
+    # dataset = 'data/Intention2_V2'  # 数据集
+    # dataset = 'data/Intention135'  # 数据集
+    dataset = args.data_dir # 数据集
+    task_name = args.task_name
     # model_dir = 'data/Intention2/saved_dict/bert.ckpt'
 
     model_name = args.model  # bert
     x = import_module('models.' + model_name)
-    config = x.Config(dataset)
+    config = x.Config(dataset, task_name)
     # config.save_path = model_dir
     np.random.seed(1)
     torch.manual_seed(1)

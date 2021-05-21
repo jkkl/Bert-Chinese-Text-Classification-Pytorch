@@ -39,7 +39,7 @@ def loadModel(dataset):
     x = import_module('models.' + model_name)
     config = x.Config(dataset)
     model = x.Model(config).to(config.device)
-    model.load_state_dict(torch.load(config.save_path))
+    model.load_state_dict(torch.load(config.save_path, map_location=torch.device(config.device)))
     return model, config 
 
 

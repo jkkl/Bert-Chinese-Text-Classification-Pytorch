@@ -59,14 +59,14 @@ def train(config, model, train_iter, dev_iter, test_iter):
             loss = F.cross_entropy(outputs, labels)
             loss.backward()
             optimizer.step()
-            if total_batch % 100 == 0:
+            if total_batch % 20 == 0:
                 # 每多少轮输出在训练集和验证集上的效果
                 true = labels.data.cpu()
                 predict = torch.max(outputs.data, 1)[1].cpu()
                 train_acc = metrics.accuracy_score(true, predict)
                 dev_acc, dev_loss = evaluate(config, model, dev_iter)
-                # if dev_loss < dev_best_loss:
-                if dev_acc > dev_best_acc:
+                if dev_loss < dev_best_loss:
+                # if dev_acc > dev_best_acc:
                     dev_best_acc = dev_acc
                     torch.save(model.state_dict(), config.save_path)
                     improve = '*'
